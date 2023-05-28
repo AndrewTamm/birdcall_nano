@@ -78,8 +78,6 @@ def reduce_noises(y, sr):
 def load_mfccs(directory, metadata_file):
     target_size = (224, 224)
 
-    print(metadata_file)
-
     with open(os.path.join(directory, metadata_file)) as m:
         metadata = json.load(m)
         audio_path = os.path.join(directory, metadata['filename'])
@@ -89,7 +87,6 @@ def load_mfccs(directory, metadata_file):
         mfccs = []
 
         chunks = split_audio(y, sr, 2, (2000,6000), -5)
-        print(f"{metadata_file} - {len(chunks)}")
 
         for chunk in chunks:
             # clean up the noise
@@ -98,15 +95,17 @@ def load_mfccs(directory, metadata_file):
             # Compute MFCCs
             mfcc =librosa.power_to_db(librosa.feature.melspectrogram(
                 np.float32(augmented_y), sr=sr, n_fft=2048, hop_length=512, n_mels=target_size[0]), ref=np.max)
-            mfcc = Image.fromarray(mfcc).resize(target_size)
+            mfcc = np.array(Image.fromarray(mfcc).resize(target_size))
             mfccs.append(mfcc)
             label = f"{metadata['genus']} {metadata['species']}"
-        return mfccs, label 
+        return mfccs, label
 
 @timing_decorator
-def multi_load(directory, test_size=0.2, random_state=42, pool_size=4):
+def multi_load(directory, test_size=0.2, random_state=None, pool_size=4, file_limit=None):
     
     metadata_files = [filename for filename in os.listdir(directory) if filename.endswith('.json')]
+    if file_limit:
+        metadata_files = metadata_files[:file_limit]
 
     with Pool(processes=pool_size) as pool:
         labels = []
@@ -123,7 +122,7 @@ def multi_load(directory, test_size=0.2, random_state=42, pool_size=4):
                 labels.extend([label] * len(chunk_mfccs))
                 mfccs.extend(chunk_mfccs)
 
-        multiple_results = [pool.apply_async(load_mfccs, (directory, metadata_file,)) for metadata_file in metadata_files[:1000]]
+        multiple_results = [pool.apply_async(load_mfccs, (directory, metadata_file,)) for metadata_file in metadata_files]
         [collect(res.get(timeout=300)) for res in multiple_results]
 
         mask = np.vectorize(class_counts.get)(labels) > 1
@@ -134,7 +133,7 @@ def multi_load(directory, test_size=0.2, random_state=42, pool_size=4):
         label_encoder = LabelEncoder()
         encoded_labels = label_encoder.fit_transform(labels)
         
-        mfccs = np.stack(mfccs)
+        #mfccs = np.stack(mfccs)
         # Split the data into training and test datasets
         X_train, X_test, y_train, y_test = train_test_split(mfccs, encoded_labels, test_size=test_size, random_state=random_state, stratify=encoded_labels)
         

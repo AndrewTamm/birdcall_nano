@@ -1,7 +1,7 @@
 import tensorflow as tf
-from pathlib import Path
+from lib.timing import timing_decorator
 
-
+@timing_decorator
 def quantize_model(model, save_path, X_train):
 
     def representative_dataset_gen():
@@ -22,11 +22,3 @@ def quantize_model(model, save_path, X_train):
         f.write(tflite_model)
 
     return tflite_model
-
-def get_tflite_model_size(tflite_model):
-    tflite_model_file = Path("temp.tflite")
-    with tflite_model_file.open("wb") as f:
-        f.write(tflite_model)
-    size = tflite_model_file.stat().st_size
-    tflite_model_file.unlink()
-    return size
