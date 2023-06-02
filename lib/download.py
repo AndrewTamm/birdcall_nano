@@ -77,3 +77,7 @@ def download_files(results, subdirectory):
             json.dump(result, metadata_file, indent=4)
             print(f"Metadata file '{metadata_filename}' saved successfully.")
 
+
+if __name__ == "__main__":
+    results = fetch_data()
+    download_files(results, 'calls')
