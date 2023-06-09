@@ -1,14 +1,15 @@
 import tensorflow as tf
 from lib.timing import timing_decorator
+import numpy as np
 
 @timing_decorator
-def quantize_model(model, save_path, X_train):
+def quantize_model(model, save_path, train_set):
 
     def representative_dataset_gen():
-            for i in range(100):
-                yield [X_train[i:i + 1]]
+            for input, _ in train_set.take(100):
+                 yield [input]
 
-    # Convert the SavedModel to TensorFlow Lite format
+    # Convert the SavedModel to TensorFlowLite format
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
     converter.representative_dataset = representative_dataset_gen
     converter.optimizations = [tf.lite.Optimize.DEFAULT]

@@ -1,24 +1,45 @@
 import matplotlib.pyplot as plt
-from matplotlib import cm
-import numpy as np
 import matplotlib
 
-def plot(X_train, X_test, y_train, y_test, label_encoder):
+def plot(dataset):
     matplotlib.interactive(False)
 
     # Plot the figure
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(nrows=2, ncols=2)
-    ax1.imshow(np.swapaxes(X_train[0], 0 ,1), interpolation='nearest', cmap=cm.viridis, origin='lower', aspect='auto')
-    ax1.set_title(label_encoder.inverse_transform([y_train[0]])[0], {'fontsize':20, 'fontweight':'bold'})
-    ax1.set_ylim(ax1.get_ylim()[::-1])
-    ax2.imshow(np.swapaxes(X_train[1], 0 ,1), interpolation='nearest', cmap=cm.viridis, origin='lower', aspect='auto')
-    ax2.set_title(label_encoder.inverse_transform([y_train[1]])[0], {'fontsize':20, 'fontweight':'bold'})
-    ax2.set_ylim(ax2.get_ylim()[::-1])
-    ax3.imshow(np.swapaxes(X_train[2], 0 ,1), interpolation='nearest', cmap=cm.viridis, origin='lower', aspect='auto')
-    ax3.set_title(label_encoder.inverse_transform([y_train[2]])[0], {'fontsize':20, 'fontweight':'bold'})
-    ax3.set_ylim(ax3.get_ylim()[::-1])
-    ax4.imshow(np.swapaxes(X_train[3], 0 ,1), interpolation='nearest', cmap=cm.viridis, origin='lower', aspect='auto')
-    ax4.set_title(label_encoder.inverse_transform([y_train[3]])[0], {'fontsize':20, 'fontweight':'bold'})
-    ax4.set_ylim(ax4.get_ylim()[::-1])
-    fig.set_size_inches(18,12)
+    class_names = dataset.class_names
+    fig = plt.figure(figsize=(10, 10))
+    for images, labels in dataset.take(1):
+        for i in range(9):
+            ax = plt.subplot(3, 3, i + 1)
+            plt.imshow(images[i].numpy().astype("uint8"))
+            plt.title(class_names[labels[i]])
+            plt.axis("off")
+
     plt.show(block=True)
+
+def plot_history(history, epochs):
+    
+    acc = history.history['accuracy']
+    val_acc = history.history['val_accuracy']
+
+    loss = history.history['loss']
+    val_loss = history.history['val_loss']
+
+    epochs_range = range(epochs)
+
+    matplotlib.interactive(False)
+
+    plt.figure(figsize=(8, 8))
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs_range, acc, label='Training Accuracy')
+    plt.plot(epochs_range, val_acc, label='Validation Accuracy')
+    plt.legend(loc='lower right')
+    plt.title('Training and Validation Accuracy')
+
+    plt.subplot(1, 2, 2)
+    plt.plot(epochs_range, loss, label='Training Loss')
+    plt.plot(epochs_range, val_loss, label='Validation Loss')
+    plt.legend(loc='upper right')
+    plt.title('Training and Validation Loss')
+    plt.show(block=True)
+
+    plt.savefig('training.png')

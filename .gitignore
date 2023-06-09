@@ -1,4 +1,9 @@
 calls/
+top_20_species/
+spectrograms/
 tar.gz
 *.tflite
 *.tar.gz
+.vscode
+labels.txt
+training.png

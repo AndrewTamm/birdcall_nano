@@ -1,7 +1,9 @@
-from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, Concatenate, GlobalAveragePooling2D, Activation, Dense
+from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, Concatenate, GlobalAveragePooling2D, Activation, Dense, Reshape, Dropout, Flatten
 from tensorflow.keras.models import Model
 import tensorflow as tf
 import numpy as np
+from sklearn.metrics import f1_score
+
 
 def fire_module(x, fire_id, squeeze=16, expand=64):
     f_id = 'fire' + str(fire_id) + '/'
@@ -49,39 +51,110 @@ def SqueezeNet(input_shape=(224, 224, 3), classes=1000):
 
     return model
 
-def evaluate_tflite_model(tflite_model, test_images, test_labels):
-    # Returns evaluation results for quantized model.
+def fire_module_next(x, squeeze_channels, expand_channels):
+    y = Conv2D(squeeze_channels, 1, activation='relu')(x)
+    y1 = Conv2D(expand_channels, 1, activation='relu', padding='same')(y)
+    y3 = Conv2D(expand_channels, 3, activation='relu', padding='same')(y)
+    return Concatenate()([y1, y3])
 
-    # Initialize the interpreter
+def SqueezeNext(input_shape=(32, 32, 3), classes=10):
+    input_img = Input(shape=input_shape)
+    y = Conv2D(64, 3, strides=2, padding='same')(input_img)
+    y = MaxPooling2D(3, strides=2)(y)
+
+    y = fire_module_next(y, 16, 64)
+    y = fire_module_next(y, 16, 64)
+    y = fire_module_next(y, 32, 128)
+    y = MaxPooling2D(3, strides=2)(y)
+
+    y = fire_module_next(y, 32, 128)
+    y = fire_module_next(y, 48, 192)
+    y = fire_module_next(y, 48, 192)
+    y = fire_module_next(y, 64, 256)
+    y = MaxPooling2D(3, strides=2)(y)
+
+    y = fire_module_next(y, 64, 256)
+    y = GlobalAveragePooling2D()(y)
+    y = Reshape((1, 1, 512))(y)
+    y = Dropout(0.5)(y)
+    y = Conv2D(classes, 1, activation='softmax')(y)
+    output = Flatten()(y)
+
+    model = Model(input_img, output)
+    return model
+
+def MobileNetV3Small(input_shape=(224, 244, 3), classes=1000):
+    base_model = tf.keras.applications.MobileNetV3Small(input_shape=input_shape, weights='imagenet', include_top=False)
+
+    base_model.trainable = False
+
+    inputs = tf.keras.Input(shape=(224, 224, 3))
+    x = base_model(inputs, training=False)
+    x = GlobalAveragePooling2D()(x)
+    x = Dense(1024, activation='relu')(x) 
+    outputs = Dense(classes, activation='softmax')(x)
+
+    return Model(inputs, outputs)
+
+def evaluate_tflite_model(tflite_model, test_dataset):
     interpreter = tf.lite.Interpreter(model_content=tflite_model)
     interpreter.allocate_tensors()
 
-    # Get input and output tensors
-    input_details = interpreter.get_input_details()
-    output_details = interpreter.get_output_details()
+    input_details = interpreter.get_input_details()[0]
+    output_details = interpreter.get_output_details()[0]
 
-    # Run predictions on every image in the "test" dataset.
     prediction_digits = []
-    for i, test_image in enumerate(test_images):
-        if i % 1000 == 0:
-            print(f"Evaluated on {i} results so far.")
-        # Pre-processing: add batch dimension and convert to float32 to match with
-        # the model's input data format.
+    for test_images, labels in test_dataset.take(1):
+        for i, test_image in enumerate(test_images):
+            if i % 1000 == 0:
+                print(f"Evaluated on {i} results so far.")
 
-        test_image = np.expand_dims(test_image, axis=0).astype(input_details[0]["dtype"])
-        interpreter.set_tensor(input_details[0]['index'], test_image)
+            if input_details['dtype'] == np.uint8 or input_details['dtype'] == np.int8:
+                input_scale, input_zero_point = input_details["quantization"]
+                test_image = test_image / input_scale + input_zero_point
 
-        # Run inference.
-        interpreter.invoke()
+            test_image = np.expand_dims(test_image, axis=0).astype(input_details["dtype"])
+            interpreter.set_tensor(input_details['index'], test_image)
 
-        # Post-processing: remove batch dimension and find the digit with highest
-        # probability.
-        output = interpreter.tensor(output_details[0]['index'])
-        digit = np.argmax(output()[0])
-        prediction_digits.append(digit)
+            interpreter.invoke()
+
+            output = interpreter.tensor(output_details['index'])
+            digit = np.argmax(output()[0])
+            prediction_digits.append(digit == labels[i])
 
     print('\n')
     # Compare prediction results with ground truth labels to calculate accuracy.
     prediction_digits = np.array(prediction_digits)
-    accuracy = (prediction_digits == test_labels).mean()
+    accuracy = prediction_digits.mean()
     return accuracy
+
+def compute_f1_score(tflite_model, test_dataset):
+    interpreter = tf.lite.Interpreter(model_content=tflite_model)
+    interpreter.allocate_tensors()
+
+    input_details = interpreter.get_input_details()[0]
+    output_details = interpreter.get_output_details()[0]
+
+    test_labels = []
+    all_predictions = []
+
+    for test_images, labels in test_dataset:
+        for i, image in enumerate(test_images):
+            if input_details['dtype'] == np.uint8 or input_details['dtype'] == np.int8:
+                input_scale, input_zero_point = input_details["quantization"]
+                image = image / input_scale + input_zero_point
+
+            image = np.expand_dims(image, axis=0).astype(input_details["dtype"])
+            interpreter.set_tensor(input_details['index'], image)
+
+            interpreter.invoke()
+
+            predictions = interpreter.get_tensor(output_details['index'])
+            predicted_label = np.argmax(predictions)
+
+            test_labels.append(labels[i])
+            all_predictions.append(predicted_label)
+
+    f1 = f1_score(test_labels, all_predictions, average='macro')
+
+    return f1

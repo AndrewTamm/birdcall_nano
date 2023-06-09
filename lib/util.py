@@ -12,6 +12,11 @@ def save_tflite_model(tflite_model, save_path):
     with open(save_path, 'wb') as f:
         f.write(tflite_model)
 
+def load_tflite_model(save_path):
+    with open(save_path, 'rb') as f:
+        tflite_model = f.read()
+    return tflite_model
+
 def get_gzipped_model_size(tflite_model):
     # Returns size of gzipped model, in bytes.
 

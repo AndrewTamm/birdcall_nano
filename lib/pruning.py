@@ -6,9 +6,9 @@ import tempfile
 import numpy as np
 
 @timing_decorator
-def apply_pruning(model, train_data, train_labels, test_data, test_labels, batch_size, epochs):
+def apply_pruning(model, train_set, val_set, epochs):
 
-    end_step = np.ceil(len(train_data) / batch_size).astype(np.int32) * epochs
+    end_step = np.ceil(len(train_set)).astype(np.int32) * epochs
     pruning_params = {
         'pruning_schedule': tfmot.sparsity.keras.PolynomialDecay(
             initial_sparsity=0.5, final_sparsity=0.8, begin_step=0, end_step=end_step)
@@ -27,9 +27,7 @@ def apply_pruning(model, train_data, train_labels, test_data, test_labels, batch
         tfmot.sparsity.keras.PruningSummaries(log_dir=logdir),
     ]
 
-    model_for_pruning.fit(train_data, train_labels,
-        batch_size=batch_size, epochs=epochs, validation_data=(test_data, test_labels),
-        callbacks=callbacks)
+    model_for_pruning.fit(train_set, epochs=epochs, validation_data=val_set, callbacks=callbacks)
 
     model_for_export = tfmot.sparsity.keras.strip_pruning(model_for_pruning)
     return model_for_export
