@@ -114,6 +114,8 @@ You can customize the sample rate, duration of audio chunks, and overlap factor 
 * `-sr` or `--sample_rate`: Specify the sample rate (default: 44100)
 * `-d` or `--duration`: Specify the duration of audio chunks (default: 2.0 seconds)
 * `-of` or `--overlap_factor`: Specify the overlap factor for audio chunks (default: 0.5)
+* `-l` or `--labels_path`: Specify the path for the label file
+* `-m` or `--model_path`: Specify the path for the TFLite model
 
 For example, to set the sample rate to 48000, duration to 2.5 seconds, and overlap factor to 0.6, use the following command:
 
